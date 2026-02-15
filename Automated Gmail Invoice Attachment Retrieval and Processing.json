@@ -1,0 +1,325 @@
+{
+  "name": "Automated Gmail Invoice Attachment Retrieval and Processing",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {
+          "q": "has:attachment"
+        },
+        "options": {
+          "dataPropertyAttachmentsPrefixName": "attachment_",
+          "downloadAttachments": true
+        }
+      },
+      "id": "da1534b1-3db5-4fdb-94d9-d161b1d72db6",
+      "name": "Gmail Trigger",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        256,
+        304
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "5iea6IoWdYpUzAFQ",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "$binary",
+        "include": "selectedOtherFields",
+        "fieldsToInclude": "id,threadId,subject,date,from,to",
+        "options": {}
+      },
+      "id": "ebd388ec-f7f9-4812-b0eb-34ea3ee0ad52",
+      "name": "Split Attachments",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        480,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "receiptDate",
+              "value": "={{ $('Gmail Trigger').item.json.date }}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "fileName",
+              "value": "={{ $('Gmail Trigger').item.json.date.split('T')[0] }}_{{ Object.keys($binary)[0] ? $binary[Object.keys($binary)[0]].fileName : 'file' }}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "originalFileName",
+              "value": "={{ Object.keys($binary)[0] ? $binary[Object.keys($binary)[0]].fileName : '' }}",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "mimeType",
+              "value": "={{ Object.keys($binary)[0] ? $binary[Object.keys($binary)[0]].mimeType : '' }}",
+              "type": "string"
+            },
+            {
+              "id": "id-5",
+              "name": "binaryPropertyName",
+              "value": "={{ Object.keys($binary)[0] }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "5b84e76b-5867-4a39-ae3d-a6a9579ed50b",
+      "name": "Prepare File Metadata",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        928,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const summary = items.map(item => ({\n  fileName: item.json.fileName,\n  receiptDate: item.json.receiptDate,\n  originalFileName: item.json.originalFileName,\n  mimeType: item.json.mimeType\n}));\n\nreturn [{\n  json: {\n    filesDownloaded: items.length,\n    timestamp: new Date().toISOString(),\n    status: 'Downloaded and processed successfully',\n    files: summary\n  }\n}];"
+      },
+      "id": "25483d61-e906-4509-bf7c-dfcec60e9a9a",
+      "name": "Log Download Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1600,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "condition-1",
+              "leftValue": "={{ Object.keys($binary)[0] ? $binary[Object.keys($binary)[0]].fileName.toLowerCase() : '' }}",
+              "rightValue": "pdf",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "condition-2",
+              "leftValue": "={{ Object.keys($binary)[0] ? $binary[Object.keys($binary)[0]].fileName.toLowerCase() : '' }}",
+              "rightValue": "xls",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "condition-3",
+              "leftValue": "={{ Object.keys($binary)[0] ? $binary[Object.keys($binary)[0]].fileName.toLowerCase() : '' }}",
+              "rightValue": "xlsx",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "condition-4",
+              "leftValue": "={{ Object.keys($binary)[0] ? $binary[Object.keys($binary)[0]].fileName.toLowerCase() : '' }}",
+              "rightValue": "doc",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "condition-5",
+              "leftValue": "={{ Object.keys($binary)[0] ? $binary[Object.keys($binary)[0]].fileName.toLowerCase() : '' }}",
+              "rightValue": "docx",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "e2dea1c8-b5ae-4c04-9565-607046a2d152",
+      "name": "Filter Invoice Files Only",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        704,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "inputDataFieldName": "={{ $json.binaryPropertyName }}",
+        "driveId": {
+          "__rl": true,
+          "value": "My Drive",
+          "mode": "list",
+          "cachedResultName": "My Drive",
+          "cachedResultUrl": "https://drive.google.com/drive/my-drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "111S0TXDSjtkOpC_ZGbfN5O7lQR_Bsy95",
+          "mode": "list",
+          "cachedResultName": "dataa",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/111S0TXDSjtkOpC_ZGbfN5O7lQR_Bsy95"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1152,
+        304
+      ],
+      "id": "c68f33f5-3f4b-49f8-a37b-f6ed8096de50",
+      "name": "Upload file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "Y6nrIw46NsxEDL9T",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "markAsRead",
+        "messageId": "={{ $('Gmail Trigger').item.json.id }}"
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1376,
+        320
+      ],
+      "id": "f599d05a-07f4-48b0-b8d0-f1810a661674",
+      "name": "Mark a message as read",
+      "webhookId": "03961bb6-324c-42e9-a689-87063be9e7ad",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "5iea6IoWdYpUzAFQ",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "Split Attachments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Attachments": {
+      "main": [
+        [
+          {
+            "node": "Filter Invoice Files Only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare File Metadata": {
+      "main": [
+        [
+          {
+            "node": "Upload file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Download Summary": {
+      "main": [
+        []
+      ]
+    },
+    "Filter Invoice Files Only": {
+      "main": [
+        [
+          {
+            "node": "Prepare File Metadata",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload file": {
+      "main": [
+        [
+          {
+            "node": "Mark a message as read",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark a message as read": {
+      "main": [
+        [
+          {
+            "node": "Log Download Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "availableInMCP": false
+  },
+  "versionId": "2b38b32a-a89f-4bab-832c-ebc70216d1b0",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3ce6e5f64c6d757c8ce58d129fcc46b9c3418bec59649cfd53dedc63e55720b6"
+  },
+  "id": "sa2bAlYFewogI7rz",
+  "tags": []
+}
